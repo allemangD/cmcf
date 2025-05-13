@@ -29,28 +29,24 @@
 // STD includes
 #include <cassert>
 
+#include <igl/cotmatrix.h>
+
 //----------------------------------------------------------------------------
 vtkStandardNewMacro(vtkSlicerCMCFlibLogic);
 
 //----------------------------------------------------------------------------
-vtkSlicerCMCFlibLogic::vtkSlicerCMCFlibLogic()
-{
-}
+vtkSlicerCMCFlibLogic::vtkSlicerCMCFlibLogic() {}
 
 //----------------------------------------------------------------------------
-vtkSlicerCMCFlibLogic::~vtkSlicerCMCFlibLogic()
-{
-}
+vtkSlicerCMCFlibLogic::~vtkSlicerCMCFlibLogic() {}
 
 //----------------------------------------------------------------------------
-void vtkSlicerCMCFlibLogic::PrintSelf(ostream& os, vtkIndent indent)
-{
+void vtkSlicerCMCFlibLogic::PrintSelf(ostream &os, vtkIndent indent) {
   this->Superclass::PrintSelf(os, indent);
 }
 
 //---------------------------------------------------------------------------
-void vtkSlicerCMCFlibLogic::SetMRMLSceneInternal(vtkMRMLScene * newScene)
-{
+void vtkSlicerCMCFlibLogic::SetMRMLSceneInternal(vtkMRMLScene *newScene) {
   vtkNew<vtkIntArray> events;
   events->InsertNextValue(vtkMRMLScene::NodeAddedEvent);
   events->InsertNextValue(vtkMRMLScene::NodeRemovedEvent);
@@ -59,25 +55,19 @@ void vtkSlicerCMCFlibLogic::SetMRMLSceneInternal(vtkMRMLScene * newScene)
 }
 
 //-----------------------------------------------------------------------------
-void vtkSlicerCMCFlibLogic::RegisterNodes()
-{
+void vtkSlicerCMCFlibLogic::RegisterNodes() {
   assert(this->GetMRMLScene() != 0);
 }
 
 //---------------------------------------------------------------------------
-void vtkSlicerCMCFlibLogic::UpdateFromMRMLScene()
-{
+void vtkSlicerCMCFlibLogic::UpdateFromMRMLScene() {
   assert(this->GetMRMLScene() != 0);
 }
 
 //---------------------------------------------------------------------------
-void vtkSlicerCMCFlibLogic
-::OnMRMLSceneNodeAdded(vtkMRMLNode* vtkNotUsed(node))
-{
-}
+void vtkSlicerCMCFlibLogic ::OnMRMLSceneNodeAdded(
+    vtkMRMLNode *vtkNotUsed(node)) {}
 
 //---------------------------------------------------------------------------
-void vtkSlicerCMCFlibLogic
-::OnMRMLSceneNodeRemoved(vtkMRMLNode* vtkNotUsed(node))
-{
-}
+void vtkSlicerCMCFlibLogic ::OnMRMLSceneNodeRemoved(
+    vtkMRMLNode *vtkNotUsed(node)) {}

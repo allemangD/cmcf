@@ -20,11 +20,9 @@
 
 // CMCFlib includes
 #include "qSlicerCMCFlibModule.h"
-#include "qSlicerCMCFlibModuleWidget.h"
 
 //-----------------------------------------------------------------------------
-class qSlicerCMCFlibModulePrivate
-{
+class qSlicerCMCFlibModulePrivate {
 public:
   qSlicerCMCFlibModulePrivate();
 };
@@ -33,78 +31,61 @@ public:
 // qSlicerCMCFlibModulePrivate methods
 
 //-----------------------------------------------------------------------------
-qSlicerCMCFlibModulePrivate::qSlicerCMCFlibModulePrivate()
-{
-}
+qSlicerCMCFlibModulePrivate::qSlicerCMCFlibModulePrivate() {}
 
 //-----------------------------------------------------------------------------
 // qSlicerCMCFlibModule methods
 
 //-----------------------------------------------------------------------------
-qSlicerCMCFlibModule::qSlicerCMCFlibModule(QObject* _parent)
-  : Superclass(_parent)
-  , d_ptr(new qSlicerCMCFlibModulePrivate)
-{
-}
+qSlicerCMCFlibModule::qSlicerCMCFlibModule(QObject *_parent)
+    : Superclass(_parent), d_ptr(new qSlicerCMCFlibModulePrivate) {}
 
 //-----------------------------------------------------------------------------
-qSlicerCMCFlibModule::~qSlicerCMCFlibModule()
-{
-}
+qSlicerCMCFlibModule::~qSlicerCMCFlibModule() {}
 
 //-----------------------------------------------------------------------------
-QString qSlicerCMCFlibModule::helpText() const
-{
+QString qSlicerCMCFlibModule::helpText() const {
   return "This is a loadable module that can be bundled in an extension";
 }
 
 //-----------------------------------------------------------------------------
-QString qSlicerCMCFlibModule::acknowledgementText() const
-{
+QString qSlicerCMCFlibModule::acknowledgementText() const {
   return "This work was partially funded by NIH grant NXNNXXNNNNNN-NNXN";
 }
 
 //-----------------------------------------------------------------------------
-QStringList qSlicerCMCFlibModule::contributors() const
-{
+QStringList qSlicerCMCFlibModule::contributors() const {
   QStringList moduleContributors;
   moduleContributors << QString("John Doe (AnyWare Corp.)");
   return moduleContributors;
 }
 
 //-----------------------------------------------------------------------------
-QIcon qSlicerCMCFlibModule::icon() const
-{
+QIcon qSlicerCMCFlibModule::icon() const {
   return QIcon(":/Icons/CMCFlib.png");
 }
 
 //-----------------------------------------------------------------------------
-QStringList qSlicerCMCFlibModule::categories() const
-{
+QStringList qSlicerCMCFlibModule::categories() const {
   return QStringList() << "Examples";
 }
 
 //-----------------------------------------------------------------------------
-QStringList qSlicerCMCFlibModule::dependencies() const
-{
-  return QStringList();
+QStringList qSlicerCMCFlibModule::dependencies() const { return QStringList(); }
+
+//-----------------------------------------------------------------------------
+bool qSlicerCMCFlibModule::isHidden() const { return true; }
+
+//-----------------------------------------------------------------------------
+void qSlicerCMCFlibModule::setup() { this->Superclass::setup(); }
+
+//-----------------------------------------------------------------------------
+qSlicerAbstractModuleRepresentation *
+qSlicerCMCFlibModule ::createWidgetRepresentation() {
+  return nullptr;
 }
 
 //-----------------------------------------------------------------------------
-void qSlicerCMCFlibModule::setup()
-{
-  this->Superclass::setup();
-}
-
-//-----------------------------------------------------------------------------
-qSlicerAbstractModuleRepresentation* qSlicerCMCFlibModule
-::createWidgetRepresentation()
-{
-  return new qSlicerCMCFlibModuleWidget;
-}
-
-//-----------------------------------------------------------------------------
-vtkMRMLAbstractLogic* qSlicerCMCFlibModule::createLogic()
-{
+vtkMRMLAbstractLogic *qSlicerCMCFlibModule::createLogic() {
   return vtkSlicerCMCFlibLogic::New();
 }

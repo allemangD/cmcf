@@ -20,7 +20,6 @@
 // This class manages the logic associated with reading, saving,
 // and changing propertied of the volumes
 
-
 #ifndef __vtkSlicerCMCFlibLogic_h
 #define __vtkSlicerCMCFlibLogic_h
 
@@ -34,30 +33,28 @@
 
 #include "vtkSlicerCMCFlibModuleLogicExport.h"
 
-
-class VTK_SLICER_CMCFLIB_MODULE_LOGIC_EXPORT vtkSlicerCMCFlibLogic :
-  public vtkSlicerModuleLogic
-{
+class VTK_SLICER_CMCFLIB_MODULE_LOGIC_EXPORT vtkSlicerCMCFlibLogic
+    : public vtkSlicerModuleLogic {
 public:
-
   static vtkSlicerCMCFlibLogic *New();
   vtkTypeMacro(vtkSlicerCMCFlibLogic, vtkSlicerModuleLogic);
-  void PrintSelf(ostream& os, vtkIndent indent) override;
+  void PrintSelf(ostream &os, vtkIndent indent) override;
 
 protected:
   vtkSlicerCMCFlibLogic();
   ~vtkSlicerCMCFlibLogic() override;
 
-  void SetMRMLSceneInternal(vtkMRMLScene* newScene) override;
-  /// Register MRML Node classes to Scene. Gets called automatically when the MRMLScene is attached to this logic class.
+  void SetMRMLSceneInternal(vtkMRMLScene *newScene) override;
+  /// Register MRML Node classes to Scene. Gets called automatically when the
+  /// MRMLScene is attached to this logic class.
   void RegisterNodes() override;
   void UpdateFromMRMLScene() override;
-  void OnMRMLSceneNodeAdded(vtkMRMLNode* node) override;
-  void OnMRMLSceneNodeRemoved(vtkMRMLNode* node) override;
-private:
+  void OnMRMLSceneNodeAdded(vtkMRMLNode *node) override;
+  void OnMRMLSceneNodeRemoved(vtkMRMLNode *node) override;
 
-  vtkSlicerCMCFlibLogic(const vtkSlicerCMCFlibLogic&); // Not implemented
-  void operator=(const vtkSlicerCMCFlibLogic&); // Not implemented
+private:
+  vtkSlicerCMCFlibLogic(const vtkSlicerCMCFlibLogic &); // Not implemented
+  void operator=(const vtkSlicerCMCFlibLogic &);        // Not implemented
 };
 
 #endif
