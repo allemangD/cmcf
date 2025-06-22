@@ -26,7 +26,7 @@ class qSlicerCMCFlibModulePrivate {
 public:
   qSlicerCMCFlibModulePrivate();
 };
-
+auto
 //-----------------------------------------------------------------------------
 // qSlicerCMCFlibModulePrivate methods
 
@@ -38,7 +38,9 @@ qSlicerCMCFlibModulePrivate::qSlicerCMCFlibModulePrivate() {}
 
 //-----------------------------------------------------------------------------
 qSlicerCMCFlibModule::qSlicerCMCFlibModule(QObject *_parent)
-    : Superclass(_parent), d_ptr(new qSlicerCMCFlibModulePrivate) {}
+  : Superclass(_parent), d_ptr(new qSlicerCMCFlibModulePrivate) {
+  this->setWidgetRepresentationCreationEnabled(false);
+}
 
 //-----------------------------------------------------------------------------
 qSlicerCMCFlibModule::~qSlicerCMCFlibModule() {}
@@ -61,14 +63,10 @@ QStringList qSlicerCMCFlibModule::contributors() const {
 }
 
 //-----------------------------------------------------------------------------
-QIcon qSlicerCMCFlibModule::icon() const {
-  return QIcon(":/Icons/CMCFlib.png");
-}
+QIcon qSlicerCMCFlibModule::icon() const { return QIcon(":/Icons/CMCFlib.png"); }
 
 //-----------------------------------------------------------------------------
-QStringList qSlicerCMCFlibModule::categories() const {
-  return QStringList() << "Examples";
-}
+QStringList qSlicerCMCFlibModule::categories() const { return QStringList() << "Examples"; }
 
 //-----------------------------------------------------------------------------
 QStringList qSlicerCMCFlibModule::dependencies() const { return QStringList(); }
@@ -81,11 +79,7 @@ void qSlicerCMCFlibModule::setup() { this->Superclass::setup(); }
 
 //-----------------------------------------------------------------------------
 qSlicerAbstractModuleRepresentation *
-qSlicerCMCFlibModule ::createWidgetRepresentation() {
-  return nullptr;
-}
+qSlicerCMCFlibModule::createWidgetRepresentation() { return nullptr; }
 
 //-----------------------------------------------------------------------------
-vtkMRMLAbstractLogic *qSlicerCMCFlibModule::createLogic() {
-  return vtkSlicerCMCFlibLogic::New();
-}
+vtkMRMLAbstractLogic *qSlicerCMCFlibModule::createLogic() { return vtkSlicerCMCFlibLogic::New(); }
