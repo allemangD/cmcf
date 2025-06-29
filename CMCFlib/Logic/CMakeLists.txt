@@ -16,9 +16,9 @@ set(${KIT}_SRCS
   )
 
 set(${KIT}_TARGET_LIBRARIES
-  PRIVATE
-  igl::core
   ${ITK_LIBRARIES}
+  igl::core
+#  vtkSlicerModelModuleMRML
   )
 
 #-----------------------------------------------------------------------------

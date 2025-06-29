@@ -19,17 +19,32 @@
 #include "vtkSlicerCMCFlibLogic.h"
 
 // MRML includes
+#include <vtkMRMLModelNode.h>
 #include <vtkMRMLScene.h>
+#include <vtkMRMLSequenceNode.h>
 
 // VTK includes
 #include <vtkIntArray.h>
 #include <vtkNew.h>
 #include <vtkObjectFactory.h>
+#include <vtkTriangleFilter.h>
+#include <vtkVector.h>
 
 // STD includes
 #include <cassert>
 
+// IGL includes
+#include <Eigen/Eigen>
+#include <Eigen/Sparse>
+#include <Eigen/SparseCholesky>
+
 #include <igl/cotmatrix.h>
+#include <igl/gaussian_curvature.h>
+#include <igl/invert_diag.h>
+#include <igl/massmatrix.h>
+#include <igl/principal_curvature.h>
+#include <igl/remove_duplicate_vertices.h>
+#include <igl/remove_unreferenced.h>
 
 //----------------------------------------------------------------------------
 vtkStandardNewMacro(vtkSlicerCMCFlibLogic);
@@ -55,19 +70,70 @@ void vtkSlicerCMCFlibLogic::SetMRMLSceneInternal(vtkMRMLScene *newScene) {
 }
 
 //-----------------------------------------------------------------------------
-void vtkSlicerCMCFlibLogic::RegisterNodes() {
-  assert(this->GetMRMLScene() != 0);
+void vtkSlicerCMCFlibLogic::RegisterNodes() { assert(this->GetMRMLScene() != 0); }
+
+//---------------------------------------------------------------------------
+void vtkSlicerCMCFlibLogic::UpdateFromMRMLScene() { assert(this->GetMRMLScene() != 0); }
+
+//---------------------------------------------------------------------------
+void vtkSlicerCMCFlibLogic::OnMRMLSceneNodeAdded(vtkMRMLNode *vtkNotUsed(node)) {}
+
+//---------------------------------------------------------------------------
+void vtkSlicerCMCFlibLogic::OnMRMLSceneNodeRemoved(vtkMRMLNode *vtkNotUsed(node)) {}
+
+//---------------------------------------------------------------------------
+void vtkSlicerCMCFlibLogic::GenerateSequence(vtkMRMLModelNode *model, vtkMRMLSequenceNode *sequence) {
+  sequence->RemoveAllDataNodes();
+
+  auto rate = 1.3;
+  // auto stages = 100;
+
+  // TODO verify that the model is not empty.
+  std::cout << "Triangulating..." << std::endl;
+
+  vtkNew<vtkTriangleFilter> triangulate;
+  triangulate->SetInputConnection(model->GetPolyDataConnection());
+  triangulate->PassLinesOff();
+  triangulate->PassVertsOff();
+  triangulate->Update();
+
+  vtkSmartPointer pdata = triangulate->GetOutput();
+
+  std::cout << "Adapting to Eigen..." << std::endl;
+
+  Eigen::MatrixX3d V{pdata->GetNumberOfPoints(), 3};
+  Eigen::MatrixX3i F{pdata->GetNumberOfCells(), 3};
+
+  for (int i = 0; i < pdata->GetNumberOfPoints(); ++i) {
+    double v[3];
+    pdata->GetPoint(i, v);
+    V.row(i) << v[0], v[1], v[2];
+  }
+
+  for (int i = 0; i < pdata->GetNumberOfCells(); ++i) {
+    auto *cell = pdata->GetCell(i);
+    if (cell->GetNumberOfPoints() != 3) { throw std::runtime_error("Failed to triangulate input mesh."); }
+
+    for (int j = 0; j < 3; ++j) { F(i, j) = static_cast<int>(cell->GetPointId(j)); }
+  }
+
+  std::cout << "Initializing solver..." << std::endl;
+
+  Eigen::SparseMatrix<double> L;
+  Eigen::SparseMatrix<double> M;
+  Eigen::SimplicialLLT<Eigen::SparseMatrix<double>> solver;
+
+  igl::cotmatrix(V, F, L);
+  std::cout << "cotmatrix: " << L.nonZeros() << " nonzeros." << std::endl;
+
+  igl::massmatrix(V, F, igl::MassMatrixType::MASSMATRIX_TYPE_BARYCENTRIC, M);
+  std::cout << "massmatrix: " << M.nonZeros() << " nonzeros." << std::endl;
+
+  solver.compute(M - rate * L);
+
+  std::cout << "Solving..." << std::endl;
+
+  V = solver.solve(M * V).eval();
+
+  std::cout << "Computed one update!" << std::endl;
 }
-
-//---------------------------------------------------------------------------
-void vtkSlicerCMCFlibLogic::UpdateFromMRMLScene() {
-  assert(this->GetMRMLScene() != 0);
-}
-
-//---------------------------------------------------------------------------
-void vtkSlicerCMCFlibLogic ::OnMRMLSceneNodeAdded(
-    vtkMRMLNode *vtkNotUsed(node)) {}
-
-//---------------------------------------------------------------------------
-void vtkSlicerCMCFlibLogic ::OnMRMLSceneNodeRemoved(
-    vtkMRMLNode *vtkNotUsed(node)) {}

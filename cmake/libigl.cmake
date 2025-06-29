@@ -9,4 +9,5 @@ FetchContent_Declare(
     GIT_TAG v2.5.0
 )
 FetchContent_MakeAvailable(libigl)
+
 export(TARGETS Eigen3_Eigen igl_core FILE libigl-config.cmake)

@@ -27,18 +27,22 @@
 #include "vtkSlicerModuleLogic.h"
 
 // MRML includes
+#include <vtkMRMLModelNode.h>
+#include <vtkMRMLScene.h>
+#include <vtkMRMLSequenceNode.h>
 
 // STD includes
 #include <cstdlib>
 
 #include "vtkSlicerCMCFlibModuleLogicExport.h"
 
-class VTK_SLICER_CMCFLIB_MODULE_LOGIC_EXPORT vtkSlicerCMCFlibLogic
-    : public vtkSlicerModuleLogic {
+class VTK_SLICER_CMCFLIB_MODULE_LOGIC_EXPORT vtkSlicerCMCFlibLogic : public vtkSlicerModuleLogic {
 public:
   static vtkSlicerCMCFlibLogic *New();
   vtkTypeMacro(vtkSlicerCMCFlibLogic, vtkSlicerModuleLogic);
   void PrintSelf(ostream &os, vtkIndent indent) override;
+
+  void GenerateSequence(vtkMRMLModelNode *model, vtkMRMLSequenceNode *sequence);
 
 protected:
   vtkSlicerCMCFlibLogic();
@@ -53,8 +57,8 @@ protected:
   void OnMRMLSceneNodeRemoved(vtkMRMLNode *node) override;
 
 private:
-  vtkSlicerCMCFlibLogic(const vtkSlicerCMCFlibLogic &); // Not implemented
-  void operator=(const vtkSlicerCMCFlibLogic &);        // Not implemented
+  vtkSlicerCMCFlibLogic(vtkSlicerCMCFlibLogic const &);  // Not implemented
+  void operator=(vtkSlicerCMCFlibLogic const &);         // Not implemented
 };
 
 #endif
