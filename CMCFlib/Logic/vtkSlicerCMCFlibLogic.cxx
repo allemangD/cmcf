@@ -81,28 +81,17 @@ void vtkSlicerCMCFlibLogic::OnMRMLSceneNodeAdded(vtkMRMLNode *vtkNotUsed(node)) 
 //---------------------------------------------------------------------------
 void vtkSlicerCMCFlibLogic::OnMRMLSceneNodeRemoved(vtkMRMLNode *vtkNotUsed(node)) {}
 
-//---------------------------------------------------------------------------
-void vtkSlicerCMCFlibLogic::GenerateSequence(vtkMRMLModelNode *model, vtkMRMLSequenceNode *sequence) {
-  sequence->RemoveAllDataNodes();
-
-  auto rate = 1.3;
-  // auto stages = 100;
-
-  // TODO verify that the model is not empty.
-  std::cout << "Triangulating..." << std::endl;
-
+void from_polydata(vtkPolyData *pdata, Eigen::MatrixX3d &V, Eigen::MatrixX3i &F) {
   vtkNew<vtkTriangleFilter> triangulate;
-  triangulate->SetInputConnection(model->GetPolyDataConnection());
+  triangulate->SetInputData(pdata);
   triangulate->PassLinesOff();
   triangulate->PassVertsOff();
   triangulate->Update();
 
-  vtkSmartPointer pdata = triangulate->GetOutput();
+  pdata = triangulate->GetOutput();
 
-  std::cout << "Adapting to Eigen..." << std::endl;
-
-  Eigen::MatrixX3d V{pdata->GetNumberOfPoints(), 3};
-  Eigen::MatrixX3i F{pdata->GetNumberOfCells(), 3};
+  V.resize(pdata->GetNumberOfPoints(), 3);
+  F.resize(pdata->GetNumberOfCells(), 3);
 
   for (int i = 0; i < pdata->GetNumberOfPoints(); ++i) {
     double v[3];
@@ -116,8 +105,28 @@ void vtkSlicerCMCFlibLogic::GenerateSequence(vtkMRMLModelNode *model, vtkMRMLSeq
 
     for (int j = 0; j < 3; ++j) { F(i, j) = static_cast<int>(cell->GetPointId(j)); }
   }
+}
 
-  std::cout << "Initializing solver..." << std::endl;
+void to_polydata(Eigen::MatrixX3d const &V, vtkPolyData *pdata) {
+  pdata->GetPoints()->SetNumberOfPoints(V.rows());
+  for (int i = 0; i < V.rows(); ++i) {
+    Eigen::Vector3d pt = V.row(i);
+    pdata->GetPoints()->SetPoint(i, pt.data());
+  }
+  pdata->GetPoints()->Modified();
+}
+
+//---------------------------------------------------------------------------
+void vtkSlicerCMCFlibLogic::GenerateSequence(vtkMRMLModelNode *model, vtkMRMLSequenceNode *sequence) {
+  sequence->RemoveAllDataNodes();
+
+  auto rate = 1.3;
+  // auto stages = 100;
+
+  // TODO verify that the model is not empty.
+  Eigen::MatrixX3d V;
+  Eigen::MatrixX3i F;
+  from_polydata(model->GetPolyData(), V, F);
 
   Eigen::SparseMatrix<double> L;
   Eigen::SparseMatrix<double> M;
@@ -134,6 +143,8 @@ void vtkSlicerCMCFlibLogic::GenerateSequence(vtkMRMLModelNode *model, vtkMRMLSeq
   std::cout << "Solving..." << std::endl;
 
   V = solver.solve(M * V).eval();
+
+  to_polydata(V, model->GetPolyData());
 
   std::cout << "Computed one update!" << std::endl;
 }
