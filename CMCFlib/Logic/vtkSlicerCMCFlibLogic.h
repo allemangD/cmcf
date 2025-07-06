@@ -42,7 +42,14 @@ public:
   vtkTypeMacro(vtkSlicerCMCFlibLogic, vtkSlicerModuleLogic);
   void PrintSelf(ostream &os, vtkIndent indent) override;
 
-  void GenerateSequence(vtkMRMLModelNode *model, vtkMRMLSequenceNode *sequence);
+  static void GenerateCMCFSequence(
+    vtkMRMLModelNode *model,
+    vtkMRMLSequenceNode *sequence,
+    double rate = 1.3,
+    int stages = 200
+  );
+
+  static void IdentifyParabolics(vtkMRMLSequenceNode *sequence, int skip = 5);
 
 protected:
   vtkSlicerCMCFlibLogic();
