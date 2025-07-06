@@ -6,12 +6,12 @@ list(PREPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 #-----------------------------------------------------------------------------
 # Extension meta-information
-set(EXTENSION_HOMEPAGE "https://www.slicer.org/wiki/Documentation/Nightly/Extensions/SlicerCMCF")
-set(EXTENSION_CONTRIBUTORS "John Doe (AnyWare Corp.)")
-set(EXTENSION_DESCRIPTION "This is an example of a simple extension")
+set(EXTENSION_HOMEPAGE "https://github.com/allemangD/cmcf")
+set(EXTENSION_CONTRIBUTORS "David Allemang (University of North Carolina at Chapel Hill)")
+set(EXTENSION_DESCRIPTION "Conformalized mean curvature flow (CMCF) implementation and visualizations in Slicer.")
 set(EXTENSION_ICONURL "https://www.example.com/Slicer/Extensions/SlicerCMCF.png")
 set(EXTENSION_SCREENSHOTURLS "https://www.example.com/Slicer/Extensions/SlicerCMCF/Screenshots/1.png")
-set(EXTENSION_DEPENDS "NA") # Specified as a list or "NA" if no dependencies
+set(EXTENSION_DEPENDS "NA")
 
 #-----------------------------------------------------------------------------
 # Extension dependencies
@@ -22,7 +22,6 @@ include(${Slicer_USE_FILE})
 # Extension modules
 add_subdirectory(CMCFlib)
 add_subdirectory(CMCF)
-## NEXT_MODULE
 
 #-----------------------------------------------------------------------------
 include(${Slicer_EXTENSION_GENERATE_CONFIG})
