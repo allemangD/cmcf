@@ -152,7 +152,7 @@ void vtkSlicerCMCFlibLogic::GenerateCMCFSequence(
 
   for (int stage = 1; stage <= stages; ++stage) {
     igl::massmatrix(V, F, igl::MassMatrixType::MASSMATRIX_TYPE_BARYCENTRIC, M);
-    if (stage == 1) std::printf("Constructed cotmatrix with %ld nonzeros.", L.nonZeros());
+    if (stage == 1) std::printf("Constructed cotmatrix with %ld nonzeros.\n", L.nonZeros());
 
     solver.compute(M - rate * L);
     V = solver.solve(M * V).eval();
@@ -178,6 +178,9 @@ void vtkSlicerCMCFlibLogic::IdentifyParabolics(vtkMRMLSequenceNode *sequence, in
   vtkNew<vtkCleanPolyData> clean;
   clean->SetInputConnection(contour->GetOutputPort());
   clean->SetTolerance(0.01);  // TODO parameterize; tune default.
+  clean->ConvertLinesToPointsOn();
+  clean->ConvertPolysToLinesOn();
+  clean->ConvertStripsToPolysOn();
   clean->PointMergingOn();
 
   vtkNew<vtkConnectivityFilter> connect;
