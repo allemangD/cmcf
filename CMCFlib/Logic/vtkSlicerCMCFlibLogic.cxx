@@ -37,7 +37,7 @@
 
 // STD includes
 #include <cassert>
-#include <iostream>
+#include <cstdio>
 
 // IGL includes
 #include <Eigen/Eigen>
@@ -47,7 +47,6 @@
 #include <igl/barycenter.h>
 #include <igl/cotmatrix.h>
 #include <igl/gaussian_curvature.h>
-#include <igl/invert_diag.h>
 #include <igl/massmatrix.h>
 #include <igl/principal_curvature.h>
 #include <igl/remove_duplicate_vertices.h>
@@ -163,7 +162,7 @@ void vtkSlicerCMCFlibLogic::GenerateCMCFSequence(
   }
 }
 
-void vtkSlicerCMCFlibLogic::IdentifyParabolics(vtkMRMLSequenceNode *sequence, int skip) {
+void vtkSlicerCMCFlibLogic::IdentifyParabolics(vtkMRMLSequenceNode *sequence, int skip, double tolerance) {
   // vtkNew<vtkCurvatures> H;
   // H->SetCurvatureTypeToMean();
 
@@ -177,7 +176,7 @@ void vtkSlicerCMCFlibLogic::IdentifyParabolics(vtkMRMLSequenceNode *sequence, in
 
   vtkNew<vtkCleanPolyData> clean;
   clean->SetInputConnection(contour->GetOutputPort());
-  clean->SetTolerance(0.01);  // TODO parameterize; tune default.
+  clean->SetTolerance(tolerance);
   clean->ConvertLinesToPointsOn();
   clean->ConvertPolysToLinesOn();
   clean->ConvertStripsToPolysOn();

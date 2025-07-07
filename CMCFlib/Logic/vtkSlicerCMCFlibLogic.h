@@ -49,7 +49,7 @@ public:
     int stages = 200
   );
 
-  static void IdentifyParabolics(vtkMRMLSequenceNode *sequence, int skip = 5);
+  static void IdentifyParabolics(vtkMRMLSequenceNode *sequence, int skip = 5, double tolerance = 0.0025);
 
 protected:
   vtkSlicerCMCFlibLogic();
