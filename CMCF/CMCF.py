@@ -1,8 +1,19 @@
+from __future__ import annotations
+
+import time
+from typing import TYPE_CHECKING, Any, Optional
+
 import slicer
+from MRMLCorePython import vtkMRMLModelNode, vtkMRMLSequenceNode, vtkMRMLSubjectHierarchyNode, vtkMRMLScene
 from slicer.ScriptedLoadableModule import *
 from slicer.i18n import tr as _
 from slicer.i18n import translate
 from slicer.util import VTKObservationMixin
+from vtkSlicerSequencesModuleLogicPython import vtkSlicerSequencesLogic
+from vtkSlicerSequencesModuleMRMLPython import vtkMRMLSequenceBrowserNode
+
+if TYPE_CHECKING:
+    from vtkSlicerCMCFlibModuleLogicPython import vtkSlicerCMCFLibLogic
 
 
 class CMCF(ScriptedLoadableModule):
@@ -10,47 +21,56 @@ class CMCF(ScriptedLoadableModule):
         ScriptedLoadableModule.__init__(self, parent)
         self.parent.title = _("CMCF")
         self.parent.categories = [translate("qSlicerAbstractCoreModule", "CMCF")]
-        self.parent.dependencies = []
-        self.parent.contributors = ["David Allemang (UNC)"]
+        self.parent.dependencies = ["CMCFlib", "Sequences"]
+        self.parent.contributors = ["David Allemang (University of North Carolina at Chapel Hill)"]
         self.parent.helpText = _("")
         self.parent.acknowledgementText = _("")
 
 
+class CMCFUI:
+    # Qt type annotations don't work, so just note these with comments.
+
+    selModel: Any  # qMRMLSubjectHierarchyTreeView
+    dsbRate: Any  # QDoubleSpinBox
+    sbStages: Any  # QSpinBox
+    selSequence: Any  # qMRMLNodeComboBox
+    btnApply: Any  # QPushButton
+
+
 class CMCFWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
+    ui: CMCFUI
+    logic: CMCFLogic
+    lib_logic: vtkSlicerCMCFLibLogic
+
+    _model: Optional[vtkMRMLModelNode] = None
+    _sequence: Optional[vtkMRMLSequenceNode] = None
+
     def __init__(self, parent=None) -> None:
         ScriptedLoadableModuleWidget.__init__(self, parent)
         VTKObservationMixin.__init__(self)
-
-        # self.logic =
-        self.logic = None
 
     def setup(self) -> None:
         """Called when the user opens the module the first time and the widget is initialized."""
         ScriptedLoadableModuleWidget.setup(self)
 
-        # Load widget from .ui file (created by Qt Designer).
-        # Additional widgets can be instantiated manually and added to self.layout.
-        uiWidget = slicer.util.loadUI(self.resourcePath("UI/CMCF.ui"))
-        self.layout.addWidget(uiWidget)
-        self.ui = slicer.util.childWidgetVariables(uiWidget)
+        root_widget = slicer.util.loadUI(self.resourcePath("UI/CMCF.ui"))
+        self.layout.addWidget(root_widget)
+        self.ui = CMCFUI()
+        self.ui.__dict__.update({  # Hack so that completions work in Python interactor.
+            widget.name: widget
+            for widget in slicer.util.findChildren(root_widget)
+            if getattr(widget, 'name', None)
+        })
 
-        # Set scene in MRML widgets. Make sure that in Qt designer the top-level qMRMLWidget's
-        # "mrmlSceneChanged(vtkMRMLScene*)" signal in is connected to each MRML widget's.
-        # "setMRMLScene(vtkMRMLScene*)" slot.
-        uiWidget.setMRMLScene(slicer.mrmlScene)
+        root_widget.setMRMLScene(slicer.mrmlScene)
 
-        # Create logic class. Logic implements all computations that should be possible to run
-        # in batch mode, without a graphical user interface.
         self.logic = CMCFLogic()
+        self.lib_logic = slicer.modules.cmcflib.logic()  # noqa
 
         # Connections
-
-        # # These connections ensure that we update parameter node when scene is closed
-        # self.addObserver(slicer.mrmlScene, slicer.mrmlScene.StartCloseEvent, self.onSceneStartClose)
-        # self.addObserver(slicer.mrmlScene, slicer.mrmlScene.EndCloseEvent, self.onSceneEndClose)
-
-        # # Buttons
-        # self.ui.applyButton.connect("clicked(bool)", self.onApplyButton)
+        self.ui.selModel.currentItemChanged.connect(self._onChangedModel)
+        self.ui.selSequence.currentNodeChanged.connect(self._onChangedSequence)
+        self.ui.btnApply.clicked.connect(self._onApply)
 
     def cleanup(self) -> None:
         """Called when the application closes and the module widget is destroyed."""
@@ -64,23 +84,63 @@ class CMCFWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         """Called each time the user opens a different module."""
         pass
 
-    def onSceneStartClose(self, caller, event) -> None:
-        """Called just before the scene is closed."""
-        pass
+    def _onChangedModel(self, item: int):
+        sh: vtkMRMLSubjectHierarchyNode = slicer.mrmlScene.GetSubjectHierarchyNode()
 
-    def onSceneEndClose(self, caller, event) -> None:
-        """Called just after the scene is closed."""
-        pass
+        if not item:
+            self.ui.btnApply.enabled = False
+            self.ui.selSequence.setCurrentNode(None)
+            self._model = None
+        else:
+            node = sh.GetItemDataNode(item)
+            self.ui.btnApply.enabled = True
+            self.ui.selSequence.setCurrentNode(node.GetNodeReference('CMCF_SEQUENCE'))
+            self._model = node
+
+    def _onChangedSequence(self, node: vtkMRMLSequenceNode):
+        self._sequence = node
+
+    def _onApply(self):
+        """Invoke vtkSlicerCMCFLibLogic::GenerateCMCFSequence and update displays with the result."""
+
+        if self._sequence is None:
+            node = self._sequence = vtkMRMLSequenceNode()
+            node.SetName(self._model.GetName() + ' CMCF')
+            slicer.mrmlScene.AddNode(node)
+            self.ui.selSequence.setCurrentNode(node)
+
+        self._model.SetNodeReferenceID('CMCF_SEQUENCE', self._sequence and self._sequence.GetID())
+
+        with slicer.util.WaitCursor():
+            _start = time.time()
+            rate = self.ui.dsbRate.value
+            stages = self.ui.sbStages.value
+            self.lib_logic.GenerateCMCFSequence(self._model, self._sequence, rate, stages)
+            _end = time.time()
+            delta = int((_end - _start) * 1000)
+            slicer.util.showStatusMessage(f'CMCF: Completed {stages} in {delta}ms.')
+
+        browser: vtkMRMLSequenceBrowserNode = slicer.modules.sequences.toolBar().activeBrowserNode()
+        if not browser:
+            browser = slicer.mrmlScene.AddNode(vtkMRMLSequenceBrowserNode())
+            slicer.modules.sequences.toolBar().setActiveBrowserNode(browser)
+
+        try:
+            slicer.mrmlScene.StartState(vtkMRMLScene.BatchProcessState)
+            sequences: vtkSlicerSequencesLogic = slicer.modules.sequences.logic()
+            sequences.AddSynchronizedNode(self._sequence, None, browser)
+
+            proxy: vtkMRMLModelNode = browser.GetProxyNode(self._sequence)
+            proxy.HideFromEditorsOn()
+            proxy.SaveWithSceneOff()
+        finally:
+            slicer.mrmlScene.EndState(vtkMRMLScene.BatchProcessState)
 
 
 class CMCFLogic(ScriptedLoadableModuleLogic, VTKObservationMixin):
     def __init__(self, parent=None) -> None:
         ScriptedLoadableModuleLogic.__init__(self, parent)
         VTKObservationMixin.__init__(self)
-
-    def getParameterNode(self):
-        # return CMCFParameterNode(super().getParameterNode())
-        return super().getParameterNode()
 
 
 class CMCFTest(ScriptedLoadableModuleTest):

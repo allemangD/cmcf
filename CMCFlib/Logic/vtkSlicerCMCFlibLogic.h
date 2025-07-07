@@ -45,11 +45,11 @@ public:
   static void GenerateCMCFSequence(
     vtkMRMLModelNode *model,
     vtkMRMLSequenceNode *sequence,
-    double rate = 1.3,
-    int stages = 200
+    double rate = 0.05,
+    int stages = 100
   );
 
-  static void IdentifyParabolics(vtkMRMLSequenceNode *sequence, int skip = 5, double tolerance = 0.0025);
+  static void IdentifyParabolics(vtkMRMLSequenceNode *sequence, int skip = 5, double tolerance = 0.005);
 
 protected:
   vtkSlicerCMCFlibLogic();
