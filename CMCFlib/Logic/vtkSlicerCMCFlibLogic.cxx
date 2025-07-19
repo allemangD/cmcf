@@ -32,6 +32,7 @@
 #include <vtkNew.h>
 #include <vtkObjectFactory.h>
 #include <vtkPointData.h>
+#include <vtkPointLocator.h>
 #include <vtkPolyData.h>
 #include <vtkTriangleFilter.h>
 
@@ -162,45 +163,109 @@ void vtkSlicerCMCFlibLogic::GenerateCMCFSequence(
   }
 }
 
-void vtkSlicerCMCFlibLogic::IdentifyParabolics(vtkMRMLSequenceNode *sequence, int skip, double tolerance) {
-  // vtkNew<vtkCurvatures> H;
-  // H->SetCurvatureTypeToMean();
-
-  vtkNew<vtkCurvatures> K;
-  K->SetCurvatureTypeToGaussian();
-  // K->SetInputConnection(H->GetOutputPort());
-
-  vtkNew<vtkContourFilter> contour;
-  contour->SetInputConnection(K->GetOutputPort());
-  contour->SetValue(0, 0);
-
-  vtkNew<vtkCleanPolyData> clean;
-  clean->SetInputConnection(contour->GetOutputPort());
-  clean->SetTolerance(tolerance);
-  clean->ConvertLinesToPointsOn();
-  clean->ConvertPolysToLinesOn();
-  clean->ConvertStripsToPolysOn();
-  clean->PointMergingOn();
-
-  vtkNew<vtkConnectivityFilter> connect;
-  connect->SetInputConnection(clean->GetOutputPort());
-  connect->SetExtractionModeToAllRegions();
+vtkSmartPointer<vtkConnectivityFilter> vtkSlicerCMCFlibLogic::IdentifyParabolics(
+  vtkMRMLSequenceNode *sequence,
+  int skip,
+  double tolerance
+) {
+  vtkSmartPointer<vtkConnectivityFilter> prev_connect;
+  vtkSmartPointer<vtkPointSet> prev_points;
 
   for (int stage = skip; stage < sequence->GetNumberOfDataNodes(); ++stage) {
     auto model = dynamic_cast<vtkMRMLModelNode *>(sequence->GetNthDataNode(stage));
 
-    // H->SetInputConnection(model->GetPolyDataConnection());
+    vtkNew<vtkCurvatures> K;
     K->SetInputConnection(model->GetPolyDataConnection());
-    connect->Update();
+    K->SetCurvatureTypeToGaussian();
 
-    vtkPolyData *parabolic = contour->GetOutput();
+    vtkNew<vtkContourFilter> contour;
+    contour->SetInputConnection(K->GetOutputPort());
+    contour->SetValue(0, 0);
+
+    vtkNew<vtkCleanPolyData> clean;
+    clean->SetInputConnection(contour->GetOutputPort());
+    clean->SetTolerance(tolerance);
+    clean->ConvertLinesToPointsOn();
+    clean->ConvertPolysToLinesOn();
+    clean->ConvertStripsToPolysOn();
+    clean->PointMergingOn();
+
+    vtkNew<vtkConnectivityFilter> connect;
+    connect->SetInputConnection(clean->GetOutputPort());
+    connect->ColorRegionsOn();
+    connect->SetExtractionModeToAllRegions();
+
+    connect->Update();
+    vtkPointSet *points = connect->GetOutput();
+
     std::printf(
       "Stage %d parabolic curve has %ld points in %d regions.\n",
       stage,
-      parabolic->GetNumberOfPoints(),
+      points->GetNumberOfPoints(),
       connect->GetNumberOfExtractedRegions()
     );
+    if (prev_points && prev_connect) {
+      std::printf(
+        "(prev had %ld in %d regions.)\n",
+        prev_points->GetNumberOfPoints(),
+        prev_connect->GetNumberOfExtractedRegions()
+      );
+
+      vtkNew<vtkPointLocator> locator;
+      locator->SetDataSet(prev_points);
+      locator->BuildLocator();
+
+      vtkDataArray *regions = points->GetPointData()->GetArray("RegionId");
+      vtkDataArray *prev_regions = prev_points->GetPointData()->GetArray("RegionId");
+      // std::vector<vtkIdType> components;
+      // std::vector<vtkIdType> components_tracked;
+
+      double scan_region = 0.0;
+      double scan_coord[3];
+      std::set<double> scan_src_regions;
+
+      auto const log_scan = [&] {
+        auto size = scan_src_regions.size();
+
+        if (size == 1) {
+          return;  // Topology unchanged. Quiet.
+        }
+
+        if (size == 2) {
+          // PEAR TOP EVENT!
+          std::printf("MERGE!");
+        } else {
+          std::printf("Noise.");
+        }
+
+        std::printf(" %0.f <-", scan_region);
+        for (double r: scan_src_regions) { std::printf(" %0.f", r); }
+        std::printf("\n");
+      };
+
+      for (vtkIdType idx = 0; idx < points->GetNumberOfPoints(); ++idx) {
+        double dst_region = regions->GetComponent(idx, 0);
+
+        points->GetPoint(idx, scan_coord);
+        vtkIdType src_idx = locator->FindClosestPoint(scan_coord);
+        double src_region = prev_regions->GetComponent(src_idx, 0);
+
+        if (scan_region != dst_region) {
+          // the scan has entered a new dst_region.
+          log_scan();
+          scan_src_regions.clear();
+          scan_region = dst_region;
+        }
+        scan_src_regions.insert(src_region);
+      }
+      log_scan();
+    }
+
+    prev_connect = connect;
+    prev_points = points;
   }
+
+  return prev_connect;
 }
 
 // region Slicer Module Logic (required boilerplate for Python wrapping)

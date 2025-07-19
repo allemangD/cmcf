@@ -115,6 +115,20 @@
       </item>
 
       <item row="5" column="0" colspan="2">
+        <widget class="QPushButton" name="btnIdentify">
+          <property name="enabled">
+            <bool>false</bool>
+          </property>
+          <property name="toolTip">
+            <string>Analyze parabolic curves and identify protrusions.</string>
+          </property>
+          <property name="text">
+            <string>Identify</string>
+          </property>
+        </widget>
+      </item>
+
+      <item row="6" column="0" colspan="2">
         <spacer name="verticalSpacer">
           <property name="orientation">
             <enum>Qt::Vertical</enum>

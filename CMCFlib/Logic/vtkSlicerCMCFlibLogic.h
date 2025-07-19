@@ -36,6 +36,8 @@
 
 #include "vtkSlicerCMCFlibModuleLogicExport.h"
 
+#include <vtkConnectivityFilter.h>
+
 class VTK_SLICER_CMCFLIB_MODULE_LOGIC_EXPORT vtkSlicerCMCFlibLogic : public vtkSlicerModuleLogic {
 public:
   static vtkSlicerCMCFlibLogic *New();
@@ -49,7 +51,11 @@ public:
     int stages = 100
   );
 
-  static void IdentifyParabolics(vtkMRMLSequenceNode *sequence, int skip = 5, double tolerance = 0.005);
+  static vtkSmartPointer<vtkConnectivityFilter> IdentifyParabolics(
+    vtkMRMLSequenceNode *sequence,
+    int skip = 5,
+    double tolerance = 0.005
+  );
 
 protected:
   vtkSlicerCMCFlibLogic();
