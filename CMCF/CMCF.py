@@ -4,8 +4,12 @@ import time
 from typing import TYPE_CHECKING, Any, Optional
 
 import slicer
-from MRMLCorePython import vtkMRMLModelNode, vtkMRMLSequenceNode, \
-    vtkMRMLSubjectHierarchyNode, vtkMRMLScene
+from MRMLCorePython import (
+    vtkMRMLModelNode,
+    vtkMRMLSequenceNode,
+    vtkMRMLSubjectHierarchyNode,
+    vtkMRMLScene, vtkMRMLModelDisplayNode,
+)
 from slicer.ScriptedLoadableModule import *
 from slicer.i18n import tr as _
 from slicer.i18n import translate
@@ -21,11 +25,11 @@ class CMCF(ScriptedLoadableModule):
     def __init__(self, parent):
         ScriptedLoadableModule.__init__(self, parent)
         self.parent.title = _("CMCF")
-        self.parent.categories = [
-            translate("qSlicerAbstractCoreModule", "CMCF")]
+        self.parent.categories = [translate("qSlicerAbstractCoreModule", "CMCF")]
         self.parent.dependencies = ["CMCFlib", "Sequences"]
         self.parent.contributors = [
-            "David Allemang (University of North Carolina at Chapel Hill)"]
+            "David Allemang (University of North Carolina at Chapel Hill)"
+        ]
         self.parent.helpText = _("")
         self.parent.acknowledgementText = _("")
 
@@ -64,8 +68,9 @@ class CMCFWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             {  # Hack so that completions work in Python interactor.
                 widget.name: widget
                 for widget in slicer.util.findChildren(root_widget)
-                if getattr(widget, 'name', None)
-            })
+                if getattr(widget, "name", None)
+            }
+        )
 
         root_widget.setMRMLScene(slicer.mrmlScene)
 
@@ -100,8 +105,7 @@ class CMCFWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         else:
             node = sh.GetItemDataNode(item)
             self.ui.btnApply.enabled = True
-            self.ui.selSequence.setCurrentNode(
-                node.GetNodeReference('CMCF_SEQUENCE'))
+            self.ui.selSequence.setCurrentNode(node.GetNodeReference("CMCF_SEQUENCE"))
             self._model = node
 
     def _onChangedSequence(self, node: vtkMRMLSequenceNode):
@@ -114,25 +118,28 @@ class CMCFWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         if self._sequence is None:
             node = self._sequence = vtkMRMLSequenceNode()
-            node.SetName(self._model.GetName() + ' CMCF')
+            node.SetName(self._model.GetName() + " CMCF")
             slicer.mrmlScene.AddNode(node)
             self.ui.selSequence.setCurrentNode(node)
 
-        self._model.SetNodeReferenceID('CMCF_SEQUENCE',
-                                       self._sequence and self._sequence.GetID())
+        self._model.SetNodeReferenceID(
+            "CMCF_SEQUENCE", self._sequence and self._sequence.GetID()
+        )
 
         with slicer.util.WaitCursor():
             _start = time.time()
             rate = self.ui.dsbRate.value
             stages = self.ui.sbStages.value
-            self.lib_logic.GenerateCMCFSequence(self._model, self._sequence,
-                                                rate, stages)
+            self.lib_logic.GenerateCMCFSequence(
+                self._model, self._sequence, rate, stages
+            )
             _end = time.time()
             delta = int((_end - _start) * 1000)
-            slicer.util.showStatusMessage(
-                f'CMCF: Completed {stages} in {delta}ms.')
+            slicer.util.showStatusMessage(f"CMCF: Completed {stages} in {delta}ms.")
 
-        browser: vtkMRMLSequenceBrowserNode = slicer.modules.sequences.toolBar().activeBrowserNode()
+        browser: vtkMRMLSequenceBrowserNode = (
+            slicer.modules.sequences.toolBar().activeBrowserNode()
+        )
         if not browser:
             browser = slicer.mrmlScene.AddNode(vtkMRMLSequenceBrowserNode())
             slicer.modules.sequences.toolBar().setActiveBrowserNode(browser)
@@ -154,7 +161,21 @@ class CMCFWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             )
             return
 
-        self.lib_logic.IdentifyParabolics(self._sequence)
+        import builtins
+        from vtkmodules.numpy_interface.dataset_adapter import WrapDataObject
+
+        builtins._result = WrapDataObject(
+            result := self.lib_logic.IdentifyParabolics(self._sequence),
+        )
+
+        slicer.mrmlScene.AddNode(model := vtkMRMLModelNode())
+        model.SetAndObservePolyData(result)
+        model.CreateDefaultDisplayNodes()
+        disp: vtkMRMLModelDisplayNode = model.GetDisplayNode()
+        disp.SetColor(0, 0, 0)
+        disp.SetOpacity(0.8)
+        # disp.SetRepresentation(vtkMRMLModelDisplayNode.PointsRepresentation)
+        disp.SetRepresentation(vtkMRMLModelDisplayNode.WireframeRepresentation)
 
 
 class CMCFLogic(ScriptedLoadableModuleLogic, VTKObservationMixin):

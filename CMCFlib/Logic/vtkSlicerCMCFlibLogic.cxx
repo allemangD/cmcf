@@ -24,6 +24,8 @@
 #include <vtkMRMLSequenceNode.h>
 
 // VTK includes
+#include <vtkAppendPolyData.h>
+#include <vtkCellData.h>
 #include <vtkCleanPolyData.h>
 #include <vtkConnectivityFilter.h>
 #include <vtkContourFilter.h>
@@ -163,13 +165,21 @@ void vtkSlicerCMCFlibLogic::GenerateCMCFSequence(
   }
 }
 
-vtkSmartPointer<vtkConnectivityFilter> vtkSlicerCMCFlibLogic::IdentifyParabolics(
+vtkSmartPointer<vtkPolyData> vtkSlicerCMCFlibLogic::IdentifyParabolics(
   vtkMRMLSequenceNode *sequence,
   int skip,
   double tolerance
 ) {
   vtkSmartPointer<vtkConnectivityFilter> prev_connect;
   vtkSmartPointer<vtkPointSet> prev_points;
+
+  vtkNew<vtkPolyData> output_curves;
+  output_curves->SetPoints(vtkPoints::New());
+  output_curves->Allocate();
+
+  vtkNew<vtkIntArray> transition_ids;
+  transition_ids->SetName("Transitions");
+  int current_transition_id = 0;
 
   for (int stage = skip; stage < sequence->GetNumberOfDataNodes(); ++stage) {
     auto model = dynamic_cast<vtkMRMLModelNode *>(sequence->GetNthDataNode(stage));
@@ -196,17 +206,26 @@ vtkSmartPointer<vtkConnectivityFilter> vtkSlicerCMCFlibLogic::IdentifyParabolics
     connect->SetExtractionModeToAllRegions();
 
     connect->Update();
-    vtkPointSet *points = connect->GetOutput();
+    auto *points = dynamic_cast<vtkPolyData *>(connect->GetOutput());
+
+    // todo Keep only VTK_LINES cells.
+
+    vtkIdType start = output_curves->GetNumberOfPoints();
+    for (vtkIdType idx = 0; idx < points->GetNumberOfPoints(); ++idx) {
+      output_curves.GetPointer()->GetPoints()->InsertNextPoint(points->GetPoint(idx));
+    }
 
     std::printf(
-      "Stage %d parabolic curve has %ld points in %d regions.\n",
+      "Stage %d parabolic curve has %lld points in %d regions.\n",
       stage,
       points->GetNumberOfPoints(),
       connect->GetNumberOfExtractedRegions()
     );
     if (prev_points && prev_connect) {
+      vtkIdType prev_start = start - prev_points->GetNumberOfPoints();
+
       std::printf(
-        "(prev had %ld in %d regions.)\n",
+        "(prev had %lld in %d regions.)\n",
         prev_points->GetNumberOfPoints(),
         prev_connect->GetNumberOfExtractedRegions()
       );
@@ -217,8 +236,6 @@ vtkSmartPointer<vtkConnectivityFilter> vtkSlicerCMCFlibLogic::IdentifyParabolics
 
       vtkDataArray *regions = points->GetPointData()->GetArray("RegionId");
       vtkDataArray *prev_regions = prev_points->GetPointData()->GetArray("RegionId");
-      // std::vector<vtkIdType> components;
-      // std::vector<vtkIdType> components_tracked;
 
       double scan_region = 0.0;
       double scan_coord[3];
@@ -231,24 +248,71 @@ vtkSmartPointer<vtkConnectivityFilter> vtkSlicerCMCFlibLogic::IdentifyParabolics
           return;  // Topology unchanged. Quiet.
         }
 
-        if (size == 2) {
-          // PEAR TOP EVENT!
-          std::printf("MERGE!");
-        } else {
-          std::printf("Noise.");
+        // if (size != 2) { return; }  // Only show 2-curve mergers.
+
+        std::printf("Merge.");
+
+        {
+          vtkDataArray *_regions = points->GetCellData()->GetArray("RegionId");
+
+          for (vtkIdType idx = 0; idx < points->GetNumberOfCells(); ++idx) {
+            if (_regions->GetComponent(idx, 0) == scan_region) {
+              vtkNew<vtkIdList> pts;
+              points->GetCellPoints(idx, pts);
+              for (int i = 0; i < pts->GetNumberOfIds(); ++i) { pts->SetId(i, pts->GetId(i) + start); }
+              output_curves->InsertNextCell(points->GetCellType(idx), pts);
+              transition_ids->InsertNextValue(current_transition_id);
+            }
+          }
         }
 
+        {
+          vtkDataArray *_regions = prev_points->GetCellData()->GetArray("RegionId");
+
+          for (double region: scan_src_regions) {
+            for (vtkIdType idx = 0; idx < prev_points->GetNumberOfPoints(); ++idx) {
+              if (_regions->GetComponent(idx, 0) == region) {
+                vtkNew<vtkIdList> pts;
+                prev_points->GetCellPoints(idx, pts);
+                for (int i = 0; i < pts->GetNumberOfIds(); ++i) { pts->SetId(i, pts->GetId(i) + prev_start); }
+                output_curves->InsertNextCell(prev_points->GetCellType(idx), pts);
+                transition_ids->InsertNextValue(current_transition_id);
+              }
+            }
+          }
+        }
+
+        current_transition_id++;
+
+        // std::vector<vtkIdType> loop;
+        // for (vtkIdType idx = 0; idx < points->GetNumberOfPoints(); ++idx) {
+        //
+        //   if (regions->GetComponent(idx, 0) == scan_region) {
+        //     loop.push_back(output_curves->GetNumberOfPoints());
+        //     output_curves->GetPoints()->InsertNextPoint(points->GetPoint(idx));
+        //   }
+        //
+        //   // vtkIdType const pts[2]{
+        //   //   start + idx,
+        //   //   start + (idx + 1) % points->GetNumberOfPoints(),
+        //   // };
+        //   // output_curves->InsertNextCell(VTK_LINE, 2, pts);
+        // }
+        // loop.push_back(start);
+        //
+        // output_curves->InsertNextCell(VTK_POLY_LINE, loop.size(), loop.data());
+
         std::printf(" %0.f <-", scan_region);
-        for (double r: scan_src_regions) { std::printf(" %0.f", r); }
+        for (auto const region: scan_src_regions) { std::printf(" %0.f", region); }
         std::printf("\n");
       };
 
       for (vtkIdType idx = 0; idx < points->GetNumberOfPoints(); ++idx) {
-        double dst_region = regions->GetComponent(idx, 0);
+        auto const dst_region = regions->GetComponent(idx, 0);
 
         points->GetPoint(idx, scan_coord);
-        vtkIdType src_idx = locator->FindClosestPoint(scan_coord);
-        double src_region = prev_regions->GetComponent(src_idx, 0);
+        vtkIdType const src_idx = locator->FindClosestPoint(scan_coord);
+        auto const src_region = prev_regions->GetComponent(src_idx, 0);
 
         if (scan_region != dst_region) {
           // the scan has entered a new dst_region.
@@ -265,7 +329,8 @@ vtkSmartPointer<vtkConnectivityFilter> vtkSlicerCMCFlibLogic::IdentifyParabolics
     prev_points = points;
   }
 
-  return prev_connect;
+  output_curves->GetCellData()->AddArray(transition_ids);
+  return output_curves;
 }
 
 // region Slicer Module Logic (required boilerplate for Python wrapping)

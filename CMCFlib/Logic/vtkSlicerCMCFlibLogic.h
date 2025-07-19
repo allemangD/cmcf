@@ -51,7 +51,7 @@ public:
     int stages = 100
   );
 
-  static vtkSmartPointer<vtkConnectivityFilter> IdentifyParabolics(
+  static vtkSmartPointer<vtkPolyData> IdentifyParabolics(
     vtkMRMLSequenceNode *sequence,
     int skip = 5,
     double tolerance = 0.005
