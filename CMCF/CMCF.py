@@ -8,7 +8,8 @@ from MRMLCorePython import (
     vtkMRMLModelNode,
     vtkMRMLSequenceNode,
     vtkMRMLSubjectHierarchyNode,
-    vtkMRMLScene, vtkMRMLModelDisplayNode,
+    vtkMRMLScene,
+    vtkMRMLModelDisplayNode,
 )
 from slicer.ScriptedLoadableModule import *
 from slicer.i18n import tr as _
@@ -39,6 +40,7 @@ class CMCFUI:
 
     selModel: Any  # qMRMLSubjectHierarchyTreeView
     dsbRate: Any  # QDoubleSpinBox
+    dsbTolerance: Any  # QDoubleSpinBox
     sbStages: Any  # QSpinBox
     selSequence: Any  # qMRMLNodeComboBox
     btnApply: Any  # QPushButton
@@ -161,21 +163,29 @@ class CMCFWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             )
             return
 
-        import builtins
-        from vtkmodules.numpy_interface.dataset_adapter import WrapDataObject
+        tolerance: float = self.ui.dsbTolerance.value
 
-        builtins._result = WrapDataObject(
-            result := self.lib_logic.IdentifyParabolics(self._sequence),
-        )
+        with slicer.util.WaitCursor():
+            result = self.lib_logic.IdentifyParabolics(
+                self._sequence,
+                5,
+                tolerance,
+            )
 
-        slicer.mrmlScene.AddNode(model := vtkMRMLModelNode())
-        model.SetAndObservePolyData(result)
-        model.CreateDefaultDisplayNodes()
-        disp: vtkMRMLModelDisplayNode = model.GetDisplayNode()
-        disp.SetColor(0, 0, 0)
-        disp.SetOpacity(0.8)
-        # disp.SetRepresentation(vtkMRMLModelDisplayNode.PointsRepresentation)
-        disp.SetRepresentation(vtkMRMLModelDisplayNode.WireframeRepresentation)
+        parabolics: vtkMRMLModelNode = self._model.GetNodeReference("CMCF_PARABOLICS")
+
+        if not parabolics:
+            parabolics = slicer.mrmlScene.AddNode(vtkMRMLModelNode())
+            self._model.SetNodeReferenceID("CMCF_PARABOLICS", parabolics.GetID())
+            parabolics.CreateDefaultDisplayNodes()
+
+        parabolics.SetAndObservePolyData(result)
+
+        disp: vtkMRMLModelDisplayNode = parabolics.GetDisplayNode()
+        if disp:
+            disp.SetColor(0, 0, 0)
+            disp.SetOpacity(0.8)
+            disp.SetRepresentation(vtkMRMLModelDisplayNode.WireframeRepresentation)
 
 
 class CMCFLogic(ScriptedLoadableModuleLogic, VTKObservationMixin):
