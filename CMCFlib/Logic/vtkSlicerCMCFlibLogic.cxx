@@ -192,16 +192,8 @@ vtkSmartPointer<vtkPolyData> vtkSlicerCMCFlibLogic::IdentifyParabolics(
     contour->SetInputConnection(K->GetOutputPort());
     contour->SetValue(0, 0);
 
-    vtkNew<vtkCleanPolyData> clean;
-    clean->SetInputConnection(contour->GetOutputPort());
-    clean->SetTolerance(tolerance);
-    clean->ConvertLinesToPointsOn();
-    clean->ConvertPolysToLinesOn();
-    clean->ConvertStripsToPolysOn();
-    clean->PointMergingOn();
-
     vtkNew<vtkConnectivityFilter> connect;
-    connect->SetInputConnection(clean->GetOutputPort());
+    connect->SetInputConnection(contour->GetOutputPort());
     connect->ColorRegionsOn();
     connect->SetExtractionModeToAllRegions();
 
@@ -283,24 +275,6 @@ vtkSmartPointer<vtkPolyData> vtkSlicerCMCFlibLogic::IdentifyParabolics(
         }
 
         current_transition_id++;
-
-        // std::vector<vtkIdType> loop;
-        // for (vtkIdType idx = 0; idx < points->GetNumberOfPoints(); ++idx) {
-        //
-        //   if (regions->GetComponent(idx, 0) == scan_region) {
-        //     loop.push_back(output_curves->GetNumberOfPoints());
-        //     output_curves->GetPoints()->InsertNextPoint(points->GetPoint(idx));
-        //   }
-        //
-        //   // vtkIdType const pts[2]{
-        //   //   start + idx,
-        //   //   start + (idx + 1) % points->GetNumberOfPoints(),
-        //   // };
-        //   // output_curves->InsertNextCell(VTK_LINE, 2, pts);
-        // }
-        // loop.push_back(start);
-        //
-        // output_curves->InsertNextCell(VTK_POLY_LINE, loop.size(), loop.data());
 
         std::printf(" %0.f <-", scan_region);
         for (auto const region: scan_src_regions) { std::printf(" %0.f", region); }
