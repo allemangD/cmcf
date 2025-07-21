@@ -34,8 +34,8 @@
 #include <vtkNew.h>
 #include <vtkObjectFactory.h>
 #include <vtkPointData.h>
-#include <vtkPointLocator.h>
 #include <vtkPolyData.h>
+#include <vtkStaticPointLocator.h>
 #include <vtkTriangleFilter.h>
 
 // STD includes
@@ -222,7 +222,7 @@ vtkSmartPointer<vtkPolyData> vtkSlicerCMCFlibLogic::IdentifyParabolics(
         prev_connect->GetNumberOfExtractedRegions()
       );
 
-      vtkNew<vtkPointLocator> locator;
+      vtkNew<vtkStaticPointLocator> locator;
       locator->SetDataSet(prev_points);
       locator->BuildLocator();
 
@@ -235,6 +235,10 @@ vtkSmartPointer<vtkPolyData> vtkSlicerCMCFlibLogic::IdentifyParabolics(
 
       auto const log_scan = [&] {
         auto size = scan_src_regions.size();
+
+        if (size == 0) {
+          return;  // Lips event. Ignore.
+        }
 
         if (size == 1) {
           return;  // Topology unchanged. Quiet.
@@ -285,16 +289,21 @@ vtkSmartPointer<vtkPolyData> vtkSlicerCMCFlibLogic::IdentifyParabolics(
         auto const dst_region = regions->GetComponent(idx, 0);
 
         points->GetPoint(idx, scan_coord);
-        vtkIdType const src_idx = locator->FindClosestPoint(scan_coord);
-        auto const src_region = prev_regions->GetComponent(src_idx, 0);
 
-        if (scan_region != dst_region) {
-          // the scan has entered a new dst_region.
-          log_scan();
-          scan_src_regions.clear();
-          scan_region = dst_region;
+        double _dist2;
+        vtkIdType const src_idx = locator->FindClosestPointWithinRadius(tolerance, scan_coord, _dist2);
+
+        if (src_idx >= 0) {
+          auto const src_region = prev_regions->GetComponent(src_idx, 0);
+
+          if (scan_region != dst_region) {
+            // the scan has entered a new dst_region.
+            log_scan();
+            scan_src_regions.clear();
+            scan_region = dst_region;
+          }
+          scan_src_regions.insert(src_region);
         }
-        scan_src_regions.insert(src_region);
       }
       log_scan();
     }
