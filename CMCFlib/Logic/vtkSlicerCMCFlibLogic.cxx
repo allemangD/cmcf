@@ -145,6 +145,7 @@ void vtkSlicerCMCFlibLogic::GenerateCMCFSequence(
   to_polydata(V, temp_model->GetPolyData());
   sequence->SetDataNodeAtValue(temp_model, std::to_string(0));
 
+  // Simplified conformalized mean curvature flow implementation:
   Eigen::SparseMatrix<double> L;
   Eigen::SparseMatrix<double> M;
   Eigen::SimplicialLLT<Eigen::SparseMatrix<double>> solver;
@@ -165,6 +166,7 @@ void vtkSlicerCMCFlibLogic::GenerateCMCFSequence(
   }
 }
 
+/// Identify protrusions via parabolic curves.
 vtkSmartPointer<vtkPolyData> vtkSlicerCMCFlibLogic::IdentifyParabolics(
   vtkMRMLSequenceNode *sequence,
   int skip,
@@ -180,6 +182,27 @@ vtkSmartPointer<vtkPolyData> vtkSlicerCMCFlibLogic::IdentifyParabolics(
   vtkNew<vtkIntArray> transition_ids;
   transition_ids->SetName("Transitions");
   int current_transition_id = 0;
+
+  /* The core loop: for each stage of flow, identify the following structures:
+   * - An octree of the parabolic curve vertices.
+   * - Connected components of the parabolic curve vertices.
+   *
+   * The connected components serve as an "ID" for each parabolic curve in each
+   * stage.
+   *
+   * Then, for each stage of flow, for each parabolic curve, build a set of the
+   * nearest parabolic curves from the prior stage.
+   *
+   * If this set has no (close) elements, then:
+   * - The current curve appeared by a lips event.
+   *
+   * If this set has a single element, then either:
+   * - The current curve was simply relabeled without changing structure.
+   * - The prior curve split into several (one of which is the current curve).
+   *
+   * If the curve has multiple elements, then:
+   * - The current curve was formed by the merging of the prior curves.
+   */
 
   for (int stage = skip; stage < sequence->GetNumberOfDataNodes(); ++stage) {
     auto model = dynamic_cast<vtkMRMLModelNode *>(sequence->GetNthDataNode(stage));
@@ -222,29 +245,33 @@ vtkSmartPointer<vtkPolyData> vtkSlicerCMCFlibLogic::IdentifyParabolics(
         prev_connect->GetNumberOfExtractedRegions()
       );
 
+      // StaticPointLocator is an octree of point locations. Provides log-n
+      // spatial lookup.
       vtkNew<vtkStaticPointLocator> locator;
       locator->SetDataSet(prev_points);
       locator->BuildLocator();
 
+      // Recall that the "RegionId" is a label for a particular parabolic
+      // curve. That is, at each vertex, the "RegionID" is the label for that
+      // vertex's parabolic curve.
       vtkDataArray *regions = points->GetPointData()->GetArray("RegionId");
       vtkDataArray *prev_regions = prev_points->GetPointData()->GetArray("RegionId");
 
+      // The vertices are ordered by their "RegionId", so in a single scan we
+      // pass through the parabolic curves in blocks. Track the current region
+      // to tell when we've moved into a new region, and track the set of
+      // sources for the current region.
       double scan_region = 0.0;
-      double scan_coord[3];
       std::set<double> scan_src_regions;
 
+      /// A closure to emit the source and current RegionId, and add the
+      /// transition to the output mesh.
       auto const log_scan = [&] {
         auto size = scan_src_regions.size();
 
-        if (size == 0) {
-          return;  // Lips event. Ignore.
-        }
-
-        if (size == 1) {
-          return;  // Topology unchanged. Quiet.
-        }
-
-        // if (size != 2) { return; }  // Only show 2-curve mergers.
+        if (size == 0) return;  // Lips event. Ignore.
+        if (size == 1) return;  // Simple relabeling.
+        // else, formed by merging.
 
         std::printf("Merge.");
 
@@ -285,6 +312,9 @@ vtkSmartPointer<vtkPolyData> vtkSlicerCMCFlibLogic::IdentifyParabolics(
         std::printf("\n");
       };
 
+      /// The main loop. For each vertex in the current curve, find the RegionID
+      /// of the nearest point in the prior stage. Collect those IDs in a set.
+      double scan_coord[3];
       for (vtkIdType idx = 0; idx < points->GetNumberOfPoints(); ++idx) {
         auto const dst_region = regions->GetComponent(idx, 0);
 
@@ -297,7 +327,7 @@ vtkSmartPointer<vtkPolyData> vtkSlicerCMCFlibLogic::IdentifyParabolics(
           auto const src_region = prev_regions->GetComponent(src_idx, 0);
 
           if (scan_region != dst_region) {
-            // the scan has entered a new dst_region.
+            // The scan has entered a new dst_region. Reset the state.
             log_scan();
             scan_src_regions.clear();
             scan_region = dst_region;
