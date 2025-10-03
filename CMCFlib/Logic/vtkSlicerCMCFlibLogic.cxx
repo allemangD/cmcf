@@ -124,6 +124,7 @@ void vtkSlicerCMCFlibLogic::GenerateCMCFSequence(
   int stages
 ) {
   std::printf("Flowing %d stages at rate %f.\n", stages, rate);
+  std::fflush(stdout);
 
   sequence->RemoveAllDataNodes();
   sequence->SetIndexType(vtkMRMLSequenceNode::NumericIndex);
@@ -148,21 +149,24 @@ void vtkSlicerCMCFlibLogic::GenerateCMCFSequence(
   // Simplified conformalized mean curvature flow implementation:
   Eigen::SparseMatrix<double> L;
   Eigen::SparseMatrix<double> M;
-  Eigen::SimplicialLLT<Eigen::SparseMatrix<double>> solver;
+
+  Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver;
 
   igl::cotmatrix(V, F, L);
-  std::printf("Constructed cotmatrix with %ld nonzeros.", L.nonZeros());
 
   for (int stage = 1; stage <= stages; ++stage) {
     igl::massmatrix(V, F, igl::MassMatrixType::MASSMATRIX_TYPE_BARYCENTRIC, M);
-    if (stage == 1) std::printf("Constructed cotmatrix with %ld nonzeros.\n", L.nonZeros());
 
-    solver.compute(M - rate * L);
+    if (stage == 1) { solver.analyzePattern(M - rate * L); }
+
+    solver.factorize(M - rate * L);
     V = solver.solve(M * V).eval();
     renorm(V, F);
 
     to_polydata(V, temp_model->GetPolyData());
     sequence->SetDataNodeAtValue(temp_model, std::to_string(stage * rate));
+
+    rate *= 1.10;
   }
 }
 
@@ -269,8 +273,8 @@ vtkSmartPointer<vtkPolyData> vtkSlicerCMCFlibLogic::IdentifyParabolics(
       auto const log_scan = [&] {
         auto size = scan_src_regions.size();
 
-        if (size == 0) return;  // Lips event. Ignore.
-        if (size == 1) return;  // Simple relabeling.
+        if (size == 0) return; // Lips event. Ignore.
+        if (size == 1) return; // Simple relabeling.
         // else, formed by merging.
 
         std::printf("Merge.");
