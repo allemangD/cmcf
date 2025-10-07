@@ -157,7 +157,6 @@ async def animate():
         jobs.append(asyncio.create_subprocess_exec(
             'ffmpeg', '-framerate', '5', '-i',
             f'out/stage%03d{suf}.png',
-            '-loop', '1',
             '-crf', '19', f'stages{suf}.webm', '-y',
         ))
 
@@ -165,7 +164,7 @@ async def animate():
 
 
 async def main():
-    # await flow()
+    await flow()
     await animate()
 
 
